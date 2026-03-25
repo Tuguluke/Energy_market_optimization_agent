@@ -1,0 +1,102 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Energy Market Optimization Agent
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [arm64]
+    Timeout: 120
+    MemorySize: 512
+    Environment:
+      Variables:
+        DYNAMODB_TABLE: !Ref RecommendationsTable
+        S3_BUCKET: !Ref PriceBucket
+        ANTHROPIC_API_KEY: !Ref AnthropicApiKey  # passed at deploy time
+
+Parameters:
+  AnthropicApiKey:
+    Type: String
+    NoEcho: true                  # hides the key from CloudFormation console
+    Description: Anthropic API key for Claude
+
+Resources:
+
+  # ── Lambda Function ─────────────────────────────────────────────────────────
+  EnergyAgentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: energy-optimization-agent
+      Handler: handler.lambda_handler
+      CodeUri: ../lambda_pkg/            # build directory (see Makefile)
+      Description: Runs energy dispatch optimization and Claude agent
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RecommendationsTable
+        - S3CrudPolicy:
+            BucketName: !Ref PriceBucket
+      Events:
+        OptimizeApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EnergyApi
+            Path: /optimize
+            Method: POST
+        AgentApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EnergyApi
+            Path: /recommend
+            Method: POST
+        HistoryApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EnergyApi
+            Path: /history
+            Method: GET
+
+  # ── API Gateway (HTTP API — cheaper than REST API) ──────────────────────────
+  EnergyApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - GET
+          - POST
+        AllowHeaders:
+          - Content-Type
+
+  # ── DynamoDB Table ──────────────────────────────────────────────────────────
+  RecommendationsTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: energy-recommendations
+      PrimaryKey:
+        Name: timestamp
+        Type: String
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+
+  # ── S3 Bucket ───────────────────────────────────────────────────────────────
+  PriceBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "energy-agent-data-${AWS::AccountId}"
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${EnergyApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  FunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt EnergyAgentFunction.Arn
+  TableName:
+    Description: DynamoDB table name
+    Value: !Ref RecommendationsTable
+  BucketName:
+    Description: S3 bucket name
+    Value: !Ref PriceBucket
