@@ -5,3 +5,4 @@ __pycache__/
 .pytest_cache/
 lambda_pkg/
 infrastructure/.aws-sam/
+.streamlit/secrets.toml

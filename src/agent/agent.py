@@ -8,6 +8,18 @@ explains recommendations in plain language.
 import os
 import anthropic
 
+def _get_api_key() -> str:
+    # 1. environment variable / .env
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if key:
+        return key
+    # 2. Streamlit secrets (when running on Streamlit Cloud)
+    try:
+        import streamlit as st
+        return st.secrets["ANTHROPIC_API_KEY"]
+    except Exception:
+        raise ValueError("ANTHROPIC_API_KEY not found in .env or Streamlit secrets")
+
 from src.agent.tools import TOOL_SCHEMAS, execute_tool
 
 SYSTEM_PROMPT = """You are an expert energy market optimization agent.
@@ -37,7 +49,7 @@ MODEL = "claude-opus-4-6"
 class EnergyAgent:
     def __init__(self, api_key: str | None = None):
         self.client = anthropic.Anthropic(
-            api_key=api_key or os.environ.get("ANTHROPIC_API_KEY")
+            api_key=api_key or _get_api_key()
         )
         self.conversation_history = []
 
