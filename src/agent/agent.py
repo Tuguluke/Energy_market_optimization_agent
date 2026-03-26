@@ -23,12 +23,14 @@ def _get_api_key() -> str:
             return key
     except ImportError:
         pass
-    # 2. Streamlit secrets (when running on Streamlit Cloud)
+    # 3. Streamlit secrets (when running on Streamlit Cloud)
     try:
         import streamlit as st
         return st.secrets["ANTHROPIC_API_KEY"]
-    except Exception:
-        raise ValueError("ANTHROPIC_API_KEY not found in .env or Streamlit secrets")
+    except KeyError:
+        raise ValueError("ANTHROPIC_API_KEY not found in Streamlit secrets — check the key name is exactly 'ANTHROPIC_API_KEY'")
+    except Exception as e:
+        raise ValueError(f"ANTHROPIC_API_KEY not found. Streamlit secrets error: {e}")
 
 from src.agent.tools import TOOL_SCHEMAS, execute_tool
 
