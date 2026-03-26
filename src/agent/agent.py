@@ -6,13 +6,23 @@ Claude decides which tools to call, interprets results, and
 explains recommendations in plain language.
 """
 import os
+from pathlib import Path
 import anthropic
 
 def _get_api_key() -> str:
-    # 1. environment variable / .env
+    # 1. environment variable (already set)
     key = os.environ.get("ANTHROPIC_API_KEY")
     if key:
         return key
+    # 2. .env file — search from this file's location upward
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+        key = os.environ.get("ANTHROPIC_API_KEY")
+        if key:
+            return key
+    except ImportError:
+        pass
     # 2. Streamlit secrets (when running on Streamlit Cloud)
     try:
         import streamlit as st
